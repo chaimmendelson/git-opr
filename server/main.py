@@ -1,12 +1,12 @@
 import logging.config
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
 import asyncio
 import os
 import uvicorn
 from fastapi.responses import JSONResponse
 from fastapi.requests import Request
-from fastapi import status
+from datetime import datetime, timedelta, UTC
 
 from .src.utils import get_current_user, logger, config
 from .src.db.gitDatabase import AsyncGit
@@ -24,6 +24,17 @@ from .src.routes import (
 from .src.utils.logger import LOGGING_CONFIG
 
 logging.config.dictConfig(LOGGING_CONFIG)
+
+async def task_manager_cleanup_loop():
+    while True:
+        await asyncio.sleep(config.SYNC_INTERVAL)
+        now = datetime.now(UTC)
+        expired = [
+            task_id for task_id, task in task_store.items()
+            if (now - task.updated_at) > timedelta(minutes=config.TASK_EXPIRATION)
+        ]
+        for task_id in expired:
+            del task_store[task_id]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,18 +66,6 @@ app.include_router(folder_routes.router)
 app.include_router(git_routes.router)
 app.include_router(task_routes.router)
 app.include_router(file_system_routes.router)
-
-
-async def task_manager_cleanup_loop():
-    while True:
-        await asyncio.sleep(60)
-        now = asyncio.get_event_loop().time()
-        expired = [
-            task_id for task_id, task in task_store.items()
-            if (now - task["created_at"]) > 300
-        ]
-        for task_id in expired:
-            del task_store[task_id]
 
 
 @app.get("/repos", response_model=ReposListResponse)

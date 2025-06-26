@@ -51,5 +51,7 @@ class Config:
 
         self.SYNC_INTERVAL: int = int(get_env_var("SYNC_INTERVAL", "60"))
 
+        self.TASK_EXPIRATION: int = int(get_env_var("TASK_EXPIRATION", "10"))
+
 # Usage:
 config = Config()
