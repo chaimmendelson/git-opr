@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel
 from typing import Optional
@@ -17,8 +17,8 @@ class TaskModel(BaseModel):
     status: TaskStatus = TaskStatus.IN_PROGRESS
     result: Optional[str] = None
     error: Optional[str] = None
-    created_at: datetime = datetime.now()
-    updated_at: datetime = datetime.now()
+    created_at: datetime = datetime.now(timezone.utc)
+    updated_at: datetime = datetime.now(timezone.utc)
 
     def update_status(
             self,
@@ -30,5 +30,5 @@ class TaskModel(BaseModel):
         self.status = status
         self.result = result
         self.error = error
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(timezone.utc)
 

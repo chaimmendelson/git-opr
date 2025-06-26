@@ -6,7 +6,7 @@ import os
 import uvicorn
 from fastapi.responses import JSONResponse
 from fastapi.requests import Request
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, UTC, timezone
 
 from .src.utils import get_current_user, logger, config
 from .src.db.gitDatabase import AsyncGit
@@ -28,11 +28,15 @@ logging.config.dictConfig(LOGGING_CONFIG)
 async def task_manager_cleanup_loop():
     while True:
         await asyncio.sleep(config.SYNC_INTERVAL)
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
+
         expired = [
             task_id for task_id, task in task_store.items()
             if (now - task.updated_at) > timedelta(minutes=config.TASK_EXPIRATION)
         ]
+
+        logger.debug(f"expiring {len(expired)} tasks")
+
         for task_id in expired:
             del task_store[task_id]
 

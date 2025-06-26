@@ -75,9 +75,18 @@ class AsyncGit:
             await self._load_repo()
             logger.debug(f"Committing changes with message: {message}")
             await asyncio.to_thread(self.repo.git.add, "--all")
-            await asyncio.to_thread(self.repo.git.commit, "-m", message)
-            logger.debug(f"Pushing changes to {self.repo_url}")
-            await asyncio.to_thread(self.repo.git.push)
+
+            try:
+                await asyncio.to_thread(self.repo.git.commit, "-m", message)
+            except GitCommandError as e:
+                if "nothing to commit" in str(e):
+                    logger.debug("No changes to commit.")
+                    return
+                raise e
+            else:
+                logger.debug(f"Pushing changes to {self.repo_url}")
+                await asyncio.to_thread(self.repo.git.push)
+
         except GitCommandError as e:
             raise Exception(f"Git error during commit: {e}")
 
