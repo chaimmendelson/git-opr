@@ -3,6 +3,7 @@ import asyncio
 
 from git import Repo, GitCommandError
 from typing import Optional, Union
+from ..utils import logger
 
 
 class AsyncGit:
@@ -22,15 +23,20 @@ class AsyncGit:
     async def clone_or_sync(self):
         """Clone the repo or update it to latest main branch."""
         if os.path.exists(self.local_path):
+            logger.debug(f"Repo already exists at {self.local_path}, loading...")
             await self._load_repo()
         else:
+            logger.debug(f"Cloning {self.repo_url} to {self.local_path}")
             self.repo = await asyncio.to_thread(Repo.clone_from, self.repo_url, self.local_path)
 
+        logger.debug(f"Checking out main branch: {self.main_branch}")
         self.repo.git.checkout(self.main_branch)
+
         await self._rebase()
 
     async def _load_repo(self):
         """Load the repo from the local path."""
+        logger.debug(f"Loading {self.repo_url} to {self.local_path}")
         if not os.path.exists(self.local_path):
             raise FileNotFoundError(f"No repo found at {self.local_path}")
         self.repo = await asyncio.to_thread(Repo, self.local_path)
@@ -40,9 +46,16 @@ class AsyncGit:
 
     async def _rebase(self):
         """Rebase the current branch onto the main branch (origin/{main_branch})."""
+        logger.debug(f"Resetting {self.repo_url} to {self.main_branch}")
         await asyncio.to_thread(self.repo.git.reset, '--hard', f"origin/{self.main_branch}")
+
+        logger.debug(f"cleaning {self.repo_url}")
         await asyncio.to_thread(self.repo.git.clean, '-xdf')
+
+        logger.debug(f"Fetching latest changes from origin/{self.main_branch}")
         await asyncio.to_thread(self.repo.remotes.origin.fetch)
+
+        logger.debug(f"Rebasing current branch onto origin/{self.main_branch}")
         await asyncio.to_thread(self.repo.git.rebase, f"origin/{self.main_branch}")
 
     # ────────────────────────────────────────────────
@@ -51,6 +64,7 @@ class AsyncGit:
 
     async def pull(self):
         try:
+            logger.debug(f"Pulling latest changes for {self.repo_url}")
             await self._load_repo()
             await asyncio.to_thread(self.repo.git.pull)
         except GitCommandError as e:
@@ -59,8 +73,10 @@ class AsyncGit:
     async def commit_and_push(self, message: str):
         try:
             await self._load_repo()
+            logger.debug(f"Committing changes with message: {message}")
             await asyncio.to_thread(self.repo.git.add, "--all")
             await asyncio.to_thread(self.repo.git.commit, "-m", message)
+            logger.debug(f"Pushing changes to {self.repo_url}")
             await asyncio.to_thread(self.repo.git.push)
         except GitCommandError as e:
             raise Exception(f"Git error during commit: {e}")
@@ -68,6 +84,7 @@ class AsyncGit:
     async def clean(self):
         try:
             await self._load_repo()
+            logger.debug(f"Cleaning untracked files in {self.repo_url}")
             await asyncio.to_thread(self.repo.git.clean, '-xdf')
         except GitCommandError as e:
             raise Exception(f"Git error during clean: {e}")
@@ -90,15 +107,18 @@ class AsyncGit:
             # Checkout to the requested branch
 
             if branch not in self.repo.branches:
+                logger.debug(f"Branch {branch} does not exist, creating it.")
                 await asyncio.to_thread(self.repo.git.checkout, "-b", branch)
                 await asyncio.to_thread(self.repo.git.push, "-u", "origin", branch)
             else:
+                logger.debug(f"Checking out existing branch: {branch}")
                 await asyncio.to_thread(self.repo.git.checkout, branch)
-
-            await self._rebase()
 
             # Update the branch attribute
             self.branch = branch
+
+            # Rebase the current branch onto the main branch
+            await self._rebase()
 
         except GitCommandError as e:
             raise Exception(f"Git error during checkout and rebase to {branch}: {e}")
@@ -107,45 +127,69 @@ class AsyncGit:
     # Folder & File Management
     # ────────────────────────────────────────────────
     async def manage_git_keep(self, relative_path: str):
+
         contents = await self.list_all(relative_path)
         git_keep_path = os.path.join(relative_path, ".gitkeep")
+
+        logger.debug(f"Checking if .gitkeep is needed in {relative_path}")
+
         if len(contents) == 0:
+            logger.debug(f"No files in {relative_path}, creating .gitkeep")
             await self.write_file(git_keep_path, "")
+
         elif len(contents) > 1 and ".gitkeep" in contents:
+            logger.debug(f"Multiple files in {relative_path}, removing .gitkeep")
             await self.delete_file(git_keep_path)
 
     async def make_folder(self, relative_path: str):
+        logger.debug(f"Creating folder at {relative_path}")
         await asyncio.to_thread(os.makedirs, self._abs_path(relative_path), exist_ok=True, mode=0o755)
         await self.manage_git_keep(relative_path)
 
     async def delete_folder(self, relative_path: str):
         full_path = self._abs_path(relative_path)
+        logger.debug(f"Deleting folder at {relative_path}")
         if not os.path.exists(full_path) or not os.path.isdir(full_path):
             raise FileNotFoundError(f"No folder found at {relative_path}")
 
         if full_path.removesuffix("/") == self.allowed_path.removesuffix("/"):
             raise PermissionError("Attempted to delete base directory")
 
+        # Remove the folder and its contents
+        logger.debug(f"Removing folder and its contents at {full_path}")
         await asyncio.to_thread(os.rmdir, full_path)
         await self.manage_git_keep(os.path.dirname(relative_path))
 
 
     async def delete_file(self, relative_path: str):
         full_path = self._abs_path(relative_path)
+
         if os.path.exists(full_path) and os.path.isfile(full_path):
+
+            logger.debug(f"Deleting file at {relative_path}")
+
             await asyncio.to_thread(os.remove, full_path)
             await self.manage_git_keep(os.path.dirname(relative_path))
+
         else:
             raise FileNotFoundError(f"No file found at {relative_path}")
 
     async def write_file(self, relative_path: str, content: str):
         full_path = self._abs_path(relative_path)
+
+        logger.debug(f"Writing file at {relative_path}")
         await asyncio.to_thread(os.makedirs, os.path.dirname(full_path), exist_ok=True, mode=0o755)
+
+        logger.debug(f"Writing file content at {relative_path}")
         await asyncio.to_thread(self._write_text, full_path, content)
+
         await self.manage_git_keep(os.path.dirname(relative_path))
 
     async def read_file(self, relative_path: str) -> str:
         full_path = self._abs_path(relative_path)
+
+        logger.debug(f"Reading file at {relative_path}")
+
         if not os.path.exists(full_path) or not os.path.isfile(full_path):
             raise FileNotFoundError(f"No file found at {relative_path}")
 
@@ -158,8 +202,11 @@ class AsyncGit:
         if not os.path.exists(old_full_path):
             raise FileNotFoundError(f"Source path does not exist: {old_full_path}")
 
+        logger.debug(f"Ensuring new path does exist: {new_relative_path}")
         # Ensure destination folder exists
         await asyncio.to_thread(os.makedirs, os.path.dirname(new_full_path), exist_ok=True)
+
+        logger.debug(f"Renaming {old_relative_path} to {new_relative_path}")
 
         # Perform rename (move)
         await asyncio.to_thread(os.rename, old_full_path, new_full_path)
@@ -172,6 +219,8 @@ class AsyncGit:
         full_path = self._abs_path(relative_path)
         if not os.path.exists(full_path):
             raise FileNotFoundError(f"No folder found at {relative_path}")
+
+        logger.debug(f"Listing files in {relative_path}")
 
         entries = await asyncio.to_thread(os.listdir, full_path)
         files = []
@@ -186,6 +235,8 @@ class AsyncGit:
         if not os.path.exists(full_path):
             raise FileNotFoundError(f"No folder found at {relative_path}")
 
+        logger.debug(f"Listing folders in {relative_path}")
+
         entries = await asyncio.to_thread(os.listdir, full_path)
         folders = []
         for entry in entries:
@@ -198,14 +249,19 @@ class AsyncGit:
         full_path = self._abs_path(relative_path)
         if not os.path.exists(full_path):
             raise FileNotFoundError(f"No folder found at {relative_path}")
+
+        logger.debug(f"Listing all contents in {relative_path}")
+
         return await asyncio.to_thread(os.listdir, full_path)
 
     def does_path_exist(self, relative_path: str) -> bool:
+        """Check if a file or folder exists at the given relative path."""
+        logger.debug(f"Checking if path exists: {relative_path}")
         return os.path.exists(self._abs_path(relative_path))
 
     async def get_tree(self, relative_path: str) -> dict:
         abs_path = self._abs_path(relative_path)
-        self._ensure_within_repo(abs_path, relative_path)
+        logger.debug(f"Getting tree structure for {relative_path}")
         return await get_tree(abs_path)
 
     # ────────────────────────────────────────────────
