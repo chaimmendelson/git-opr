@@ -19,7 +19,7 @@ router = APIRouter(tags=["Folder Management"], prefix="/v1/folder")
 
 
 
-@router.post("/", response_model=TaskResponse)
+@router.post("", response_model=TaskResponse)
 async def make_folder(
     repo_id: str = Query(...),
     path: str = Query(...),
@@ -39,7 +39,7 @@ async def make_folder(
 
 
 
-@router.delete("/", response_model=TaskResponse)
+@router.delete("", response_model=TaskResponse)
 async def delete_folder(
     repo_id: str = Query(...),
     path: str = Query(...),

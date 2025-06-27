@@ -1,14 +1,33 @@
 from fastapi import APIRouter, Query, HTTPException, Depends
 
-from ..models.responses import FileListResponse, FolderListResponse, PathExistsResponse
-from ..services.task_manager import get_git_handler, get_git_lock
+from ..models.responses import FileListResponse, FolderListResponse, PathExistsResponse, TaskResponse
+from ..services.task_manager import get_git_handler, get_git_lock, enqueue_task
 from ..models.repos_file import AuthLevel
-from ..utils import verify_repo_access_with_level, log_action
+from ..utils import verify_repo_access_with_level, log_action, log_task_start
 from ..utils.logger import logger
 
 
 router = APIRouter(tags=["File System"], prefix="/v1/fs")
 
+
+@router.patch("/rename", response_model=TaskResponse)
+async def rename_path(
+    repo_id: str = Query(...),
+    old_path: str = Query(...),
+    new_path: str = Query(...),
+    user: str = Depends(verify_repo_access_with_level(AuthLevel.WRITE)),
+):
+
+    task = await enqueue_task(
+        repo_id=repo_id,
+        action=lambda: get_git_handler(repo_id).rename_path(req.old_path, req.new_path),
+        message=f"Rename file from {old_path} to {new_path}",
+        user=user
+    )
+
+    log_task_start(task)
+
+    return TaskResponse(task_id=task.task_id)
 
 
 @router.get("/list", response_model=dict)

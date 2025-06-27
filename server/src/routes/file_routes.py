@@ -25,7 +25,7 @@ from ..services.task_manager import (
 router = APIRouter(tags=["File Management"], prefix="/v1/file")
 
 
-@router.post("/", response_model=TaskResponse)
+@router.post("", response_model=TaskResponse)
 async def upload_file(
     repo_id: str = Query(...),
     path: str = Query(..., description="Destination file path"),
@@ -48,7 +48,7 @@ async def upload_file(
 
 
 
-@router.get("/")
+@router.get("")
 async def download_file(
     repo_id: str = Query(...),
     path: str = Query(...),
@@ -73,7 +73,7 @@ async def download_file(
 
 
 
-@router.delete("/", response_model=TaskResponse)
+@router.delete("", response_model=TaskResponse)
 async def delete_file(
     repo_id: str = Query(...),
     path: str = Query(...),
@@ -86,25 +86,5 @@ async def delete_file(
         f"Delete file: {path}",
         user
     )
-
-    return TaskResponse(task_id=task.task_id)
-
-
-
-@router.patch("/rename", response_model=TaskResponse)
-async def rename_file(
-    repo_id: str = Query(...),
-    req: FileRenameRequest = Body(...),
-    user: str = Depends(verify_repo_access_with_level(AuthLevel.WRITE)),
-):
-
-    task = await enqueue_task(
-        repo_id=repo_id,
-        action=lambda: get_git_handler(repo_id).rename_path(req.old_path, req.new_path),
-        message=f"Rename file from {req.old_path} to {req.new_path}",
-        user=user
-    )
-
-    log_task_start(task)
 
     return TaskResponse(task_id=task.task_id)

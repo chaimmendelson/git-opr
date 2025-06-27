@@ -29,7 +29,7 @@ async def get_task_status(
 
     return task
 
-@router.get("/", response_model=list[TaskStatusResponse])
+@router.get("", response_model=list[TaskStatusResponse])
 async def list_tasks(
         user: str = Depends(get_current_user)
 ):

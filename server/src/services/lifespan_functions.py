@@ -9,8 +9,18 @@ from ..db.gitDatabase import AsyncGit
 from ..utils import logger, config
 from ..utils.logger import update_log_level
 from ..db import reposFile
-from .task_manager import git_instances, git_locks, sync_repo_periodically, task_store
+from .task_manager import git_instances, git_locks, task_store
 
+
+async def sync_repo_periodically(repo_id: str, git_handler: AsyncGit):
+    while True:
+        async with git_locks[repo_id]:
+            try:
+                await git_handler.clone_or_sync()
+                logger.info(f"[Sync] Pulled latest for repo '{repo_id}'")
+            except Exception as e:
+                logger.warning(f"[Sync] Failed to sync '{repo_id}': {e}")
+        await asyncio.sleep(config.SYNC_INTERVAL)
 
 async def reload_environment_variables():
     while True:

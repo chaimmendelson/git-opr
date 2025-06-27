@@ -45,7 +45,12 @@ class GitError(AppError):
     default_message = "An unexpected error occurred."
 
     def __init__(self, message: str = None, repo: str = None):
+
+        if message is None:
+            message = self.default_message
+
         super().__init__(f"{message} [Repo: {repo}]")
+        self.repo = repo
 
 
 class GitConnectionError(GitError):
