@@ -4,3 +4,5 @@ id_rsa
 repos.json
 .env
 repos/
+
+*.log
