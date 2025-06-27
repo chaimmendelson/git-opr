@@ -9,17 +9,15 @@ git_instances: Dict[str, AsyncGit] = {}
 git_locks: Dict[str, asyncio.Lock] = {}
 task_store: Dict[str, TaskModel] = {}
 
-
 async def sync_repo_periodically(repo_id: str, git_handler: AsyncGit):
     while True:
         async with git_locks[repo_id]:
             try:
-                await git_handler.pull()
-                logger.info(f"Periodic sync successful for {repo_id}")
+                await git_handler.clone_or_sync()
+                logger.info(f"[Sync] Pulled latest for repo '{repo_id}'")
             except Exception as e:
-                logger.info(f"Periodic sync failed for {repo_id}: {e}")
+                logger.warning(f"[Sync] Failed to sync '{repo_id}': {e}")
         await asyncio.sleep(config.SYNC_INTERVAL)
-
 
 def get_git_handler(repo_id: str) -> AsyncGit:
     logger.debug(f"Getting git handler for {repo_id}")

@@ -1,6 +1,9 @@
+import os
+import logging
+import logging.config
+from logging.handlers import RotatingFileHandler
 from colorama import init as colorama_init, Fore, Style
 from .config import config
-import logging.config
 
 colorama_init(autoreset=True)
 
@@ -20,48 +23,82 @@ class ColoredFormatter(logging.Formatter):
         return f"{color}{message}{Style.RESET_ALL}"
 
 
-# Logging configuration dictionary
+def get_log_level():
+    """Retrieve and validate the configured log level."""
+    level = getattr(config, "LOG_LEVEL", "INFO").upper()
+    return level if level in LOG_COLORS else "INFO"
+
+# Ensure the log directory exists
+os.makedirs(os.path.dirname(config.LOG_FILE_PATH), exist_ok=True)
+
 LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'colored': {
-            '()': ColoredFormatter,  # Apply the custom ColoredFormatter
+            '()': ColoredFormatter,
             'fmt': '%(asctime)s - %(levelname)s - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'standard': {
+            'format': '%(asctime)s - %(levelname)s - %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         }
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG' if config.DEBUG else 'INFO',  # Set level based on config
+            'level': get_log_level(),
             'class': 'logging.StreamHandler',
             'formatter': 'colored',
+        },
+        'file': {
+            'level': get_log_level(),
+            'class': 'logging.handlers.RotatingFileHandler',
+            'formatter': 'standard',
+            'filename': config.LOG_FILE_PATH,
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
+            'backupCount': 5,
+            'encoding': 'utf-8',
         }
     },
     'loggers': {
         'app': {
-            'level': 'DEBUG' if config.DEBUG else 'INFO',  # Set level based on config
-            'handlers': ['console'],
+            'level': get_log_level(),
+            'handlers': ['console', 'file'],
             'propagate': False,
         },
         'uvicorn': {
-            'level': 'INFO',  # Uvicorn logger level
-            'handlers': ['console'],
+            'level': get_log_level(),
+            'handlers': ['console', 'file'],
             'propagate': False,
         },
         'uvicorn.access': {
-            'level': 'INFO',  # Uvicorn access logger level
+            'level': 'INFO',
             'handlers': [],
             'propagate': False,
         },
     }
 }
 
-# Apply the logging configuration
 logging.config.dictConfig(LOGGING_CONFIG)
 
-# Get the logger
 logger = logging.getLogger("app")
+
+
+def update_log_level():
+    """Update logger level dynamically based on config.LOG_LEVEL."""
+    new_level = get_log_level()
+
+    if logger.level == logging.getLevelName(new_level):
+        return
+
+    for name in ("app", "uvicorn"):
+        logging.getLogger(name).setLevel(new_level)
+
+    for handler in logging.getLogger("app").handlers:
+        handler.setLevel(new_level)
+
+    logger.debug(f"Log level updated to: {new_level}")
 
 
 def get_logger():

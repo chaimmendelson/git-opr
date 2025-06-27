@@ -5,6 +5,18 @@ from git import Repo, GitCommandError
 from typing import Optional, Union
 from ..utils import logger
 
+from ..exceptions import (
+    GitError,
+    GitConnectionError,
+    GitRebaseError,
+    GitCommitError,
+    GitPushError,
+    FileNotFound,
+    FolderNotFound,
+    InvalidPathError,
+    PathAccessDenied
+)
+
 
 class AsyncGit:
     def __init__(self, repo_url: str, local_path: str, base_folder: str, main_branch: str = "master"):
@@ -22,57 +34,100 @@ class AsyncGit:
 
     async def clone_or_sync(self):
         """Clone the repo or update it to latest main branch."""
+
         if os.path.exists(self.local_path):
             logger.debug(f"Repo already exists at {self.local_path}, loading...")
             await self._load_repo()
+
         else:
-            logger.debug(f"Cloning {self.repo_url} to {self.local_path}")
-            self.repo = await asyncio.to_thread(Repo.clone_from, self.repo_url, self.local_path)
+
+            try:
+
+                logger.debug(f"Cloning {self.repo_url} to {self.local_path}")
+                self.repo = await asyncio.to_thread(Repo.clone_from, self.repo_url, self.local_path)
+
+            except GitCommandError as e:
+
+                if "Could not resolve hostname" in f"{e}":
+                    raise GitConnectionError(repo=self.repo_url) from e
+
+                raise GitError(f"Failed to clone repository", repo=self.repo_url) from e
 
         logger.debug(f"Checking out main branch: {self.main_branch}")
+
         self.repo.git.checkout(self.main_branch)
 
         await self._rebase()
 
     async def _load_repo(self):
         """Load the repo from the local path."""
-        logger.debug(f"Loading {self.repo_url} to {self.local_path}")
+
+        logger.debug(f"Loading {self.repo_url} to {self.base_folder}")
+
         if not os.path.exists(self.local_path):
-            raise FileNotFoundError(f"No repo found at {self.local_path}")
+            raise InvalidPathError(f"No repo found", path=self.base_folder)
+
         self.repo = await asyncio.to_thread(Repo, self.local_path)
 
         if self.repo.bare:
-            raise Exception("Repo is bare and unusable")
+            raise GitError(f"Repository is bare and cannot be used", repo=self.repo_url)
 
     async def _rebase(self):
         """Rebase the current branch onto the main branch (origin/{main_branch})."""
-        logger.debug(f"Resetting {self.repo_url} to {self.main_branch}")
-        await asyncio.to_thread(self.repo.git.reset, '--hard', f"origin/{self.main_branch}")
 
-        logger.debug(f"cleaning {self.repo_url}")
-        await asyncio.to_thread(self.repo.git.clean, '-xdf')
+        try:
 
-        logger.debug(f"Fetching latest changes from origin/{self.main_branch}")
-        await asyncio.to_thread(self.repo.remotes.origin.fetch)
+            logger.debug(f"Resetting {self.repo_url} to {self.main_branch}")
+            await asyncio.to_thread(self.repo.git.reset, '--hard', f"origin/{self.main_branch}")
 
-        logger.debug(f"Rebasing current branch onto origin/{self.main_branch}")
-        await asyncio.to_thread(self.repo.git.rebase, f"origin/{self.main_branch}")
+            logger.debug(f"cleaning {self.repo_url}")
+            await asyncio.to_thread(self.repo.git.clean, '-xdf')
+
+            logger.debug(f"Fetching latest changes from origin/{self.main_branch}")
+            await asyncio.to_thread(self.repo.remotes.origin.fetch)
+
+            logger.debug(f"Rebasing current branch onto origin/{self.main_branch}")
+            await asyncio.to_thread(self.repo.git.rebase, f"origin/{self.main_branch}")
+
+        except GitCommandError as e:
+
+            if "Could not read from remote repository" in str(e):
+
+                logger.debug(f"Connection error while rebasing {self.repo_url}: {e}")
+                raise GitConnectionError(repo=self.repo_url) from e
+
+            logger.debug(f"Failed to rebase: {e}")
+
+            raise GitRebaseError(repo=self.repo_url) from e
 
     # ────────────────────────────────────────────────
     # Git Operations
     # ────────────────────────────────────────────────
 
     async def pull(self):
+
         try:
+
             logger.debug(f"Pulling latest changes for {self.repo_url}")
+
             await self._load_repo()
             await asyncio.to_thread(self.repo.git.pull)
+
         except GitCommandError as e:
-            raise Exception(f"Git error during pull: {e}")
+
+            if "Could not resolve hostname" in f"{e}":
+
+                logger.debug(f"Connection error while pulling {self.repo_url}: {e}")
+                raise GitConnectionError(repo=self.repo_url) from e
+
+            logger.debug(f"Failed to pull: {e}")
+            raise GitError("Failed to pull", repo=self.repo_url) from e
 
     async def commit_and_push(self, message: str):
+
         try:
             await self._load_repo()
+
             logger.debug(f"Committing changes with message: {message}")
             await asyncio.to_thread(self.repo.git.add, "--all")
 
@@ -83,20 +138,28 @@ class AsyncGit:
                     logger.debug("No changes to commit.")
                     return
                 raise e
+
             else:
                 logger.debug(f"Pushing changes to {self.repo_url}")
                 await asyncio.to_thread(self.repo.git.push)
 
         except GitCommandError as e:
-            raise Exception(f"Git error during commit: {e}")
+
+            logger.debug(f"Failed to commit and push changes: {e}")
+            raise GitCommitError(repo=self.repo_url) from e
 
     async def clean(self):
+
         try:
             await self._load_repo()
+
             logger.debug(f"Cleaning untracked files in {self.repo_url}")
             await asyncio.to_thread(self.repo.git.clean, '-xdf')
+
         except GitCommandError as e:
-            raise Exception(f"Git error during clean: {e}")
+
+            logger.debug(f"Failed to clean untracked files: {e}")
+            raise GitError(f"Git error during clean: {e}", repo=self.repo_url) from e
 
     # ────────────────────────────────────────────────
     # Branch Operations
@@ -116,10 +179,13 @@ class AsyncGit:
             # Checkout to the requested branch
 
             if branch not in self.repo.branches:
+
                 logger.debug(f"Branch {branch} does not exist, creating it.")
                 await asyncio.to_thread(self.repo.git.checkout, "-b", branch)
                 await asyncio.to_thread(self.repo.git.push, "-u", "origin", branch)
+
             else:
+
                 logger.debug(f"Checking out existing branch: {branch}")
                 await asyncio.to_thread(self.repo.git.checkout, branch)
 
@@ -130,7 +196,12 @@ class AsyncGit:
             await self._rebase()
 
         except GitCommandError as e:
-            raise Exception(f"Git error during checkout and rebase to {branch}: {e}")
+
+            logger.debug(f"Failed to checkout {branch}: {e}")
+            raise GitError(
+                f"Error during checkout and rebase to {branch}",
+                repo=self.repo_url
+            ) from e
 
     # ────────────────────────────────────────────────
     # Folder & File Management
@@ -152,17 +223,26 @@ class AsyncGit:
 
     async def make_folder(self, relative_path: str):
         logger.debug(f"Creating folder at {relative_path}")
+
         await asyncio.to_thread(os.makedirs, self._abs_path(relative_path), exist_ok=True, mode=0o755)
         await self.manage_git_keep(relative_path)
 
     async def delete_folder(self, relative_path: str):
         full_path = self._abs_path(relative_path)
         logger.debug(f"Deleting folder at {relative_path}")
+
         if not os.path.exists(full_path) or not os.path.isdir(full_path):
-            raise FileNotFoundError(f"No folder found at {relative_path}")
+            raise FolderNotFound(
+                path=relative_path,
+                repo=self.repo_url
+            )
 
         if full_path.removesuffix("/") == self.allowed_path.removesuffix("/"):
-            raise PermissionError("Attempted to delete base directory")
+            raise PathAccessDenied(
+                message="Attempted to delete base directory",
+                path=relative_path,
+                repo=self.repo_url
+            )
 
         # Remove the folder and its contents
         logger.debug(f"Removing folder and its contents at {full_path}")
@@ -181,7 +261,10 @@ class AsyncGit:
             await self.manage_git_keep(os.path.dirname(relative_path))
 
         else:
-            raise FileNotFoundError(f"No file found at {relative_path}")
+            raise FolderNotFound(
+                path=relative_path,
+                repo=self.repo_url
+            )
 
     async def write_file(self, relative_path: str, content: str):
         full_path = self._abs_path(relative_path)
@@ -200,7 +283,10 @@ class AsyncGit:
         logger.debug(f"Reading file at {relative_path}")
 
         if not os.path.exists(full_path) or not os.path.isfile(full_path):
-            raise FileNotFoundError(f"No file found at {relative_path}")
+            raise FolderNotFound(
+                path=relative_path,
+                repo=self.repo_url
+            )
 
         return await asyncio.to_thread(self._read_text, full_path)
 
@@ -209,11 +295,14 @@ class AsyncGit:
         new_full_path = self._abs_path(new_relative_path)
 
         if not os.path.exists(old_full_path):
-            raise FileNotFoundError(f"Source path does not exist: {old_full_path}")
+            raise InvalidPathError(
+                path=old_relative_path,
+                repo=self.repo_url
+            )
 
         logger.debug(f"Ensuring new path does exist: {new_relative_path}")
-        # Ensure destination folder exists
-        await asyncio.to_thread(os.makedirs, os.path.dirname(new_full_path), exist_ok=True)
+
+        await asyncio.to_thread(os.makedirs, os.path.dirname(new_full_path), exist_ok=True, mode=0o755)
 
         logger.debug(f"Renaming {old_relative_path} to {new_relative_path}")
 
@@ -226,8 +315,12 @@ class AsyncGit:
 
     async def list_files_only(self, relative_path: str) -> list[str]:
         full_path = self._abs_path(relative_path)
+
         if not os.path.exists(full_path):
-            raise FileNotFoundError(f"No folder found at {relative_path}")
+            raise InvalidPathError(
+                path=relative_path,
+                repo=self.repo_url
+            )
 
         logger.debug(f"Listing files in {relative_path}")
 
@@ -241,8 +334,12 @@ class AsyncGit:
 
     async def list_folders_only(self, relative_path: str) -> list[str]:
         full_path = self._abs_path(relative_path)
+
         if not os.path.exists(full_path):
-            raise FileNotFoundError(f"No folder found at {relative_path}")
+            raise InvalidPathError(
+                path=relative_path,
+                repo=self.repo_url
+            )
 
         logger.debug(f"Listing folders in {relative_path}")
 
@@ -257,7 +354,10 @@ class AsyncGit:
     async def list_all(self, relative_path: str) -> list[str]:
         full_path = self._abs_path(relative_path)
         if not os.path.exists(full_path):
-            raise FileNotFoundError(f"No folder found at {relative_path}")
+            raise InvalidPathError(
+                path=relative_path,
+                repo=self.repo_url
+            )
 
         logger.debug(f"Listing all contents in {relative_path}")
 
@@ -265,13 +365,15 @@ class AsyncGit:
 
     def does_path_exist(self, relative_path: str) -> bool:
         """Check if a file or folder exists at the given relative path."""
+
         logger.debug(f"Checking if path exists: {relative_path}")
         return os.path.exists(self._abs_path(relative_path))
 
     async def get_tree(self, relative_path: str) -> dict:
+
         abs_path = self._abs_path(relative_path)
         logger.debug(f"Getting tree structure for {relative_path}")
-        return await get_tree(abs_path)
+        return await get_tree(abs_path, self.repo_url)
 
     # ────────────────────────────────────────────────
     # Internal Helpers
@@ -293,15 +395,26 @@ class AsyncGit:
             f.write(content)
 
     def _ensure_within_repo(self, abs_path: str, relative_path: str):
+
         repo_root = os.path.abspath(os.path.join(self.local_path, self.base_folder))
         abs_path = os.path.abspath(abs_path)
+
         if not abs_path.startswith(repo_root):
-            raise PermissionError(f"Access denied, outside repository root: {relative_path}")
+            raise PathAccessDenied(
+                f"Access denied, outside repository root",
+                path=relative_path,
+                repo=self.repo_url
+            )
+
         if abs_path.endswith(".git") or abs_path.find(".git/") != -1:
-            raise PermissionError(f"Access denied, Attempting to access .git: {relative_path}")
+            raise PathAccessDenied(
+                f"Access denied, Attempting to access .git",
+                path=relative_path,
+                repo=self.repo_url
+            )
 
 
-async def get_tree(base_path: str) -> dict:
+async def get_tree(base_path: str, repo_url: str) -> dict:
     def build_tree(path):
         tree = {"name": os.path.basename(path), "type": "folder", "children": []}
         try:
@@ -318,7 +431,11 @@ async def get_tree(base_path: str) -> dict:
                             "type": "file"
                         })
         except FileNotFoundError:
-            raise FileNotFoundError(f"Path not found: {path}")
+            raise FolderNotFound(
+                f"Path not found",
+                path=path,
+                repo=repo_url
+            )
         return tree
 
     abs_path = os.path.abspath(base_path)

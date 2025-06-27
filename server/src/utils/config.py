@@ -3,19 +3,6 @@ from dotenv import load_dotenv
 
 
 def get_env_var(env_var: str, default=None) -> str:
-    """
-    Get an environment variable, raise error if not found and no default provided.
-
-    Args:
-        env_var (str): The environment variable name.
-        default (any, optional): The default value if env var is missing.
-
-    Returns:
-        str: The environment variable value or the default.
-
-    Raises:
-        ValueError: If env var is not set and no default is provided.
-    """
     value = os.getenv(env_var)
     if value is None or value == "":
         if default is not None:
@@ -27,31 +14,47 @@ def get_env_var(env_var: str, default=None) -> str:
 class Config:
     """Loads environment variables from a .env file and provides access to them."""
 
-    def __init__(self, env_file: str = ".env"):
-        load_dotenv(env_file, override=True)  # Load .env variables
+    def __init__(self):
 
-        self.PORT = int(get_env_var("PORT", 5000))
+        # Declare all attributes
+        self.PORT: int = 5000
+        self.DEBUG: bool = False
+        self.LOG_LEVEL: str = "INFO"
+        self.GIT_PRIVATE_KEY_PATH: str = "./id_rsa"
+        self.BASE_CLONE_PATH: str = "./repos"
+        self.CONFIG_FILE: str = "./config.yaml"
+        self.LOG_FILE_PATH: str = "./logs/app.log"
+        self.SYNC_INTERVAL: int = 60
+        self.TASK_EXPIRATION: int = 10
 
-        self.DEBUG = get_env_var("DEBUG", "false").lower() in ("true", "1", "yes")
+        self.load_vars()
 
-        git_key_path = get_env_var("GIT_PRIVATE_KEY_PATH", "./id_rsa")
-        self.GIT_PRIVATE_KEY_PATH = (
-            os.path.abspath(git_key_path) if git_key_path else None
+    def load_vars(self):
+        load_dotenv(override=True)
+
+        self.PORT = int(get_env_var("PORT", self.PORT))
+        self.DEBUG = get_env_var("DEBUG", str(self.DEBUG)).lower() in ("true", "1", "yes")
+        self.LOG_LEVEL = get_env_var("LOG_LEVEL", str(self.LOG_LEVEL)).upper()
+
+        git_key_path = get_env_var("GIT_PRIVATE_KEY_PATH", self.GIT_PRIVATE_KEY_PATH)
+        self.GIT_PRIVATE_KEY_PATH = os.path.abspath(git_key_path)
+
+        os.chmod(self.GIT_PRIVATE_KEY_PATH, 0o600)
+
+        os.environ["GIT_SSH_COMMAND"] = (
+            f'ssh -i "{self.GIT_PRIVATE_KEY_PATH}" -o StrictHostKeyChecking=no'
         )
 
-        if self.GIT_PRIVATE_KEY_PATH:
-            os.chmod(self.GIT_PRIVATE_KEY_PATH, 0o600)
-            os.environ[
-                "GIT_SSH_COMMAND"
-            ] = f'ssh -i "{self.GIT_PRIVATE_KEY_PATH}" -o StrictHostKeyChecking=no'
+        self.BASE_CLONE_PATH = get_env_var("BASE_CLONE_PATH", self.BASE_CLONE_PATH)
+        self.CONFIG_FILE = get_env_var("CONFIG_FILE", self.CONFIG_FILE)
+        self.LOG_FILE_PATH = get_env_var("LOG_FILE_PATH", self.LOG_FILE_PATH)
+        self.SYNC_INTERVAL = int(get_env_var("SYNC_INTERVAL", str(self.SYNC_INTERVAL)))
+        self.TASK_EXPIRATION = int(get_env_var("TASK_EXPIRATION", str(self.TASK_EXPIRATION)))
 
-        self.BASE_CLONE_PATH = get_env_var("BASE_CLONE_PATH", "./repos")
+    def reload(self):
+        """Reload the environment variables, preserving current values if env is missing."""
+        self.load_vars()
 
-        self.CONFIG_FILE = get_env_var("CONFIG_FILE", "./config.yaml")
 
-        self.SYNC_INTERVAL: int = int(get_env_var("SYNC_INTERVAL", "60"))
-
-        self.TASK_EXPIRATION: int = int(get_env_var("TASK_EXPIRATION", "10"))
-
-# Usage:
+# Usage
 config = Config()
