@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from fastapi import APIRouter, Query, Body, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, Query, HTTPException, Depends, UploadFile, File
 from starlette.responses import StreamingResponse
 
 from ..utils.logger import logger
@@ -11,9 +11,6 @@ from ..utils import (
 )
 
 from ..models.repos_file import AuthLevel
-from ..models.requests import (
-    FileRenameRequest
-)
 from ..models.responses import TaskResponse
 
 from ..services.task_manager import (

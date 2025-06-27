@@ -2,15 +2,6 @@ from pydantic import BaseModel
 from typing import List, Union, Optional
 from .tasks import TaskModel
 
-class GenericResponse(BaseModel):
-    status: str
-
-class FileListResponse(BaseModel):
-    files: List[str]
-
-class FolderListResponse(BaseModel):
-    folders: List[str]
-
 class PathExistsResponse(BaseModel):
     exists: bool
 

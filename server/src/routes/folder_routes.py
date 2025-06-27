@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Query, Body, HTTPException, Depends
+from fastapi import APIRouter, Query, Depends
 
-from ..models.responses import FolderListResponse, TaskResponse
+from ..models.responses import TaskResponse
 from ..services.task_manager import (
     get_git_handler,
-    get_git_lock,
     enqueue_task
 )
-from ..utils.logger import logger
+
 from ..utils import (
     verify_repo_access_with_level,
     log_task_start,
-    log_action
 )
 from ..models.repos_file import AuthLevel
 

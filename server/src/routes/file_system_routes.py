@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Query, HTTPException, Depends
 
-from ..models.responses import FileListResponse, FolderListResponse, PathExistsResponse, TaskResponse
-from ..services.task_manager import get_git_handler, get_git_lock, enqueue_task
+from ..models.responses import PathExistsResponse, TaskResponse
+from ..services.task_manager import get_git_handler, enqueue_task
 from ..models.repos_file import AuthLevel
 from ..utils import verify_repo_access_with_level, log_action, log_task_start
-from ..utils.logger import logger
 
 
 router = APIRouter(tags=["File System"], prefix="/v1/fs")
