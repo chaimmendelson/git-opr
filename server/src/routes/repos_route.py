@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from ..db import reposFile
 from ..models.repos_file import AuthLevel
@@ -8,7 +8,7 @@ from ..utils import get_current_user
 router = APIRouter(tags=["Repos Management"], prefix="/v1/repos")
 
 
-@router.get("", response_model=ReposListResponse)
+@router.get("", response_model=ReposListResponse, status_code=status.HTTP_200_OK)
 async def list_repos(
         user: str = Depends(get_current_user)
 ):

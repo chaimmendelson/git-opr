@@ -2,8 +2,9 @@ from pydantic import BaseModel
 from typing import List, Union, Optional
 from .tasks import TaskModel
 
-class PathExistsResponse(BaseModel):
-    exists: bool
+class ListContentResponse(BaseModel):
+    folders: List[str]
+    files: List[str]
 
 class RepoInfo(BaseModel):
     repo_id: str

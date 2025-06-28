@@ -13,6 +13,7 @@ from .routes import (
 )
 
 from .services.lifespan_functions import lifespan
+from .exceptions.exceptions import AppError
 
 
 def create_app() -> FastAPI:
@@ -47,11 +48,12 @@ def create_app() -> FastAPI:
         logger.info(f"Response: [{request.client.host}] {response.status_code}")
         return response
 
-    @app.exception_handler(PermissionError)
-    async def permission_exception_handler(request: Request, exc: PermissionError):
+    @app.exception_handler(AppError)
+    async def app_error_handler(request: Request, exc: AppError):
+        logger.info(f"AppError: [{request.client.host}] {exc.detail}")
         return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={"detail": str(exc)},
+            status_code=exc.status_code,
+            content={"detail": str(exc.message)}
         )
 
     # Handle httpException

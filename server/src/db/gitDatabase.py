@@ -65,7 +65,7 @@ class AsyncGit:
         logger.debug(f"Loading {self.repo_url} to {self.base_folder}")
 
         if not os.path.exists(self.local_path):
-            raise InvalidPathError(f"No repo found", path=self.base_folder)
+            raise InvalidPathError(path=self.base_folder)
 
         self.repo = await asyncio.to_thread(Repo, self.local_path)
 
@@ -239,7 +239,6 @@ class AsyncGit:
 
         if full_path.removesuffix("/") == self.allowed_path.removesuffix("/"):
             raise PathAccessDenied(
-                message="Attempted to delete base directory",
                 path=relative_path,
                 repo=self.repo_url
             )
@@ -401,14 +400,12 @@ class AsyncGit:
 
         if not abs_path.startswith(repo_root):
             raise PathAccessDenied(
-                f"Access denied, outside repository root",
                 path=relative_path,
                 repo=self.repo_url
             )
 
         if abs_path.endswith(".git") or abs_path.find(".git/") != -1:
             raise PathAccessDenied(
-                f"Access denied, Attempting to access .git",
                 path=relative_path,
                 repo=self.repo_url
             )
@@ -432,7 +429,6 @@ async def get_tree(base_path: str, repo_url: str) -> dict:
                         })
         except FileNotFoundError:
             raise FolderNotFound(
-                f"Path not found",
                 path=path,
                 repo=repo_url
             )

@@ -14,7 +14,8 @@ def log_task_completion(task: TaskModel) -> None:
 def log_task_failure(task: TaskModel) -> None:
     """Log the failure of a task."""
     logger.info(
-        f"Task {task.description} with id {task.task_id} for {task.user} failed. Error: {task.error}"
+        f"Task {task.description} with id {task.task_id} for {task.user} failed with {task.status_code}. "
+        f"Error: {task.error}"
     )
 
 def log_action(user: str, action: str) -> None:

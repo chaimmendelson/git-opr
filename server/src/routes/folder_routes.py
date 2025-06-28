@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, status
 
 from ..models.responses import TaskResponse
 from ..services.task_manager import (
@@ -17,7 +17,7 @@ router = APIRouter(tags=["Folder Management"], prefix="/v1/folder")
 
 
 
-@router.post("", response_model=TaskResponse)
+@router.post("", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
 async def make_folder(
     repo_id: str = Query(...),
     path: str = Query(...),
@@ -37,7 +37,7 @@ async def make_folder(
 
 
 
-@router.delete("", response_model=TaskResponse)
+@router.delete("", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
 async def delete_folder(
     repo_id: str = Query(...),
     path: str = Query(...),

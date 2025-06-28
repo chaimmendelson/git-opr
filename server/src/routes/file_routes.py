@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from fastapi import APIRouter, Query, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, Query, HTTPException, Depends, UploadFile, File, status
 from starlette.responses import StreamingResponse
 
 from ..utils.logger import logger
@@ -22,7 +22,7 @@ from ..services.task_manager import (
 router = APIRouter(tags=["File Management"], prefix="/v1/file")
 
 
-@router.post("", response_model=TaskResponse)
+@router.post("", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_file(
     repo_id: str = Query(...),
     path: str = Query(..., description="Destination file path"),
@@ -45,7 +45,7 @@ async def upload_file(
 
 
 
-@router.get("")
+@router.get("", response_class=StreamingResponse, status_code=status.HTTP_200_OK)
 async def download_file(
     repo_id: str = Query(...),
     path: str = Query(...),
@@ -70,7 +70,7 @@ async def download_file(
 
 
 
-@router.delete("", response_model=TaskResponse)
+@router.delete("", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
 async def delete_file(
     repo_id: str = Query(...),
     path: str = Query(...),

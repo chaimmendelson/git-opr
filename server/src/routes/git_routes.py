@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, status
 
 from ..models.responses import TaskResponse
 from ..services.task_manager import get_git_handler, enqueue_task
@@ -8,7 +8,7 @@ from ..models.repos_file import AuthLevel
 
 router = APIRouter(tags=["Git Operations"], prefix="/v1/git")
 
-@router.post("/pull", response_model=TaskResponse)
+@router.post("/pull", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
 async def pull(
     repo_id: str = Query(...),
     user: str = Depends(verify_repo_access_with_level(AuthLevel.READ)),

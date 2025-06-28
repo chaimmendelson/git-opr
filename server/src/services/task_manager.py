@@ -1,9 +1,12 @@
 import asyncio
 from typing import Dict, Callable
 import uuid
+from fastapi import status as http_status
+
+from ..exceptions.exceptions import AppError
 from ..db.gitDatabase import AsyncGit
 from ..models.tasks import TaskModel, TaskStatus
-from ..utils import logger, config, log_task_failure, log_task_completion
+from ..utils import logger, log_task_failure, log_task_completion
 
 git_instances: Dict[str, AsyncGit] = {}
 git_locks: Dict[str, asyncio.Lock] = {}
@@ -28,11 +31,17 @@ def create_task(user: str, description: str) -> str:
     return task_id
 
 
-def set_task_result(task_id: str, status: TaskStatus, result: str = None, error: str = None):
+def set_task_result(
+        task_id: str,
+        status: TaskStatus,
+        result: str = None,
+        error: str = None,
+        status_code: int = http_status.HTTP_200_OK
+):
     task = task_store.get(task_id)
     if task:
-        logger.debug(f"Setting result for task {task_id} with status: {status}")
-        task.update_status(status=status, result=result, error=error)
+        logger.debug(f"Setting result for task {task_id} with status: {status_code}, {status}")
+        task.update_status(status=status, result=result, error=error, status_code=status_code)
     else:
         logger.debug(f"Task ID {task_id} not found for updating status")
 
@@ -56,8 +65,17 @@ async def enqueue_task(repo_id: str, action: Callable, message: str, user: str) 
             set_task_result(task_id, TaskStatus.COMPLETED, result=message)
             log_task_completion(task_store[task_id])
 
+        except AppError as err:
+            set_task_result(task_id, TaskStatus.FAILED, error=str(err), status_code=err.status_code)
+            log_task_failure(task_store[task_id])
+
         except Exception as e:
-            set_task_result(task_id, TaskStatus.FAILED, error=str(e))
+            set_task_result(
+                task_id, TaskStatus.FAILED,
+                error=str(e), status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+            logger.warn(f"Task {task_id} failed with error: {e}", exc_info=e)
             log_task_failure(task_store[task_id])
 
     asyncio.create_task(run())
