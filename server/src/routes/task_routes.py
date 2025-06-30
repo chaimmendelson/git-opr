@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, Depends, status
 
 from ..models.responses import TaskStatusResponse
 from ..models.tasks import TaskModel

@@ -21,9 +21,9 @@ class Config:
         self.DEBUG: bool = False
         self.LOG_LEVEL: str = "INFO"
         self.GIT_PRIVATE_KEY_PATH: str = "./id_rsa"
-        self.BASE_CLONE_PATH: str = "./repos"
+        self.BASE_CLONE_PATH: str = "./server/repos"
         self.CONFIG_FILE: str = "./config.yaml"
-        self.LOG_FILE_PATH: str = "./logs/app.log"
+        self.LOG_FILE_PATH: str = "./server/logs/app.log"
         self.SYNC_INTERVAL: int = 60
         self.TASK_EXPIRATION: int = 10
 

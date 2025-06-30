@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Union, Optional
+from typing import List
 from .tasks import TaskModel
 
 class ListContentResponse(BaseModel):

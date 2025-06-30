@@ -2,11 +2,11 @@ import json
 import os
 from typing import Optional
 
-from pydantic import ValidationError, RootModel
+from pydantic import ValidationError
 
 from ..models.repos_file import ReposConfig, RepoConfig
 from ..utils.logger import logger
-from ..exceptions import (
+from ..exceptions.exceptions import (
     ConfigError
 )
 

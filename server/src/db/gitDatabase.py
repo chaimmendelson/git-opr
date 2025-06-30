@@ -2,16 +2,14 @@ import os
 import asyncio
 
 from git import Repo, GitCommandError
-from typing import Optional, Union
+from typing import Optional
 from ..utils import logger
 
-from ..exceptions import (
+from ..exceptions.exceptions import (
     GitError,
     GitConnectionError,
     GitRebaseError,
     GitCommitError,
-    GitPushError,
-    FileNotFound,
     FolderNotFound,
     InvalidPathError,
     PathAccessDenied
@@ -51,7 +49,7 @@ class AsyncGit:
                 if "Could not resolve hostname" in f"{e}":
                     raise GitConnectionError(repo=self.repo_url) from e
 
-                raise GitError(f"Failed to clone repository", repo=self.repo_url) from e
+                raise GitError("Failed to clone repository", repo=self.repo_url) from e
 
         logger.debug(f"Checking out main branch: {self.main_branch}")
 
@@ -70,7 +68,7 @@ class AsyncGit:
         self.repo = await asyncio.to_thread(Repo, self.local_path)
 
         if self.repo.bare:
-            raise GitError(f"Repository is bare and cannot be used", repo=self.repo_url)
+            raise GitError("Repository is bare and cannot be used", repo=self.repo_url)
 
     async def _rebase(self):
         """Rebase the current branch onto the main branch (origin/{main_branch})."""

@@ -1,7 +1,6 @@
 import os
 import logging
 import logging.config
-from logging.handlers import RotatingFileHandler
 from colorama import init as colorama_init, Fore, Style
 from .config import config
 

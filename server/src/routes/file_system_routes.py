@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException, Depends, status, Response
+from fastapi import APIRouter, Query, Depends, status, Response
 
 from ..models.responses import ListContentResponse, TaskResponse
 from ..services.task_manager import get_git_handler, enqueue_task

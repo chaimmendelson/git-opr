@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from ..db import reposFile, ReposFile
+from ..db import reposFile
 import jwt
 
 from ..models.repos_file import AuthLevel

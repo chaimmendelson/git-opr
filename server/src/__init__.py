@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from fastapi.requests import Request
-from .utils import logger, config
+from fastapi.responses import JSONResponse
 
+from .exceptions.exceptions import AppError
 from .routes import (
     file_routes,
     folder_routes,
@@ -11,9 +11,8 @@ from .routes import (
     file_system_routes,
     repos_route
 )
-
 from .services.lifespan_functions import lifespan
-from .exceptions.exceptions import AppError
+from .utils import logger
 
 
 def create_app() -> FastAPI:
