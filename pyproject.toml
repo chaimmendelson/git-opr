@@ -1,0 +1,31 @@
+[project]
+name = "git-opr"
+version = "0.1.0"
+description = "Async Git handler using FastAPI"
+authors = [{ name = "Your Name", email = "your@email.com" }]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "colorama",
+    "GitPython",
+    "pydantic",
+    "pyjwt",
+    "python-dotenv",
+    "python-multipart",
+    "starlette"
+]
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "ruff",
+    "mypy"
+]
+
+[project.scripts]
+start = "server.main:main"
+
+[tool.uv]
