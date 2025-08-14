@@ -22,8 +22,9 @@ def load_config(file_path: str) -> ReposConfig:
         return ReposConfig.model_validate(raw_data)
 
     except ValidationError as e:
-        logger.error("Invalid config:", e)
-        raise ConfigError("Invalid configuration format") from e
+        errors = e.errors(include_input=False, include_url=False)
+        logger.error(f"Invalid config: {errors}")
+        raise ConfigError(f"Invalid configuration format: {errors}") from e
 
 class ReposFile:
 
